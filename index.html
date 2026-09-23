@@ -123,6 +123,8 @@
       .app-shell.auth-hidden { display: none; }
       .top-user { display: flex; align-items: center; gap: 10px; }
       .logout-button { background: transparent; color: var(--muted); font-size: 11px; padding: 0; }
+      .excel-actions { display: grid; gap: 7px; margin-top: 12px; }
+      .excel-actions .settings-button { text-align: left; }
       #subject-form .section-heading { justify-content: space-between; margin-top: 20px; }
       #subject-form .section-heading h3 { font-size: 13px; margin: 0; }
       @media (max-width: 760px) { .auth-screen { padding: 16px; } .auth-layout { display: block; } .auth-showcase { display: none; } .auth-card { padding: 32px 24px; } }
@@ -169,7 +171,7 @@
           <button class="nav-item" data-view="resumen"><span class="nav-icon">◒</span>Resumen</button>
         </nav>
           <div class="sidebar-section"><p class="eyebrow">Mis calendarios</p><div id="calendar-filters"></div><button class="sidebar-add-button" id="open-category-sidebar">＋ Nueva categoría</button></div>
-        <div class="sidebar-bottom"><div class="sync-status"><span class="pulse"></span><span>Sincronizado ahora</span></div><button class="settings-button">⚙ <span>Ajustes</span></button></div>
+        <div class="sidebar-bottom"><div class="sync-status"><span class="pulse"></span><span>Sincronizado ahora</span></div><div class="excel-actions"><button class="settings-button" id="import-excel" type="button">Importar Excel</button><button class="settings-button" id="export-excel" type="button">Guardar Excel</button><input id="excel-file" type="file" accept=".xlsx,.xls" hidden /></div></div>
       </aside>
 
       <main class="main-content">

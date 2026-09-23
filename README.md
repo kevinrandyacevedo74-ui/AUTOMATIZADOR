@@ -94,8 +94,13 @@ También puedes abrir `index.html` directamente en el navegador para usar la ver
 - Alta de actividades con comprobación de conflictos.
 - Sugerencia de la fecha libre más cercana cuando no existe disponibilidad.
 - Resumen de horas por categoría.
-- Persistencia local mediante `localStorage`.
+- Caché local para arranque rápido y persistencia principal en Supabase por usuario.
+- Importación y exportación de una base de datos personal en Excel (`.xlsx`). El archivo contiene hojas para actividades, eventos, categorías, semestres, materias y bloques.
 
-## Próxima etapa para producción
+### Base de datos personal en Excel
 
-Para sincronización en tiempo real entre computador y teléfono habría que conectar este frontend a una API y una base de datos (por ejemplo, Supabase o Firebase), añadir autenticación y reemplazar `localStorage` por suscripciones a cambios.
+Desde la barra lateral puedes usar **Guardar Excel** para descargar una copia completa de la agenda. Usa **Importar Excel** para cargar esa copia en otro navegador o recuperar tus datos; la importación reemplaza los datos actuales y actualiza la agenda inmediatamente. El archivo se procesa localmente en el navegador y no se comparte con otros usuarios.
+
+## Actualizar una instalación existente
+
+Si ya ejecutaste una versión anterior de `supabase-schema.sql`, vuelve a ejecutarlo completo para crear las columnas de notas de cuidados y preparación usadas por las actividades. La aplicación elimina en Supabase los registros que el usuario haya eliminado localmente y escucha cambios en tiempo real mediante Realtime.

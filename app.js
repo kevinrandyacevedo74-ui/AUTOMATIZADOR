@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { supabase } from './supabase-client.js';
 
 const dayNames = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
@@ -11,6 +12,14 @@ Object.entries(fixedCategories).forEach(([key, category]) => { categoryColors[ke
 let nameColors = JSON.parse(localStorage.getItem('ritmo-name-colors')) || {};
 let semesters = JSON.parse(localStorage.getItem('ritmo-semesters')) || [];
 const $ = selector => document.querySelector(selector);
+
+function ensureAdditionalActivityFields() {
+	const form = $('#activity-form');
+	if (!form || $('#activity-notes')) return;
+	const toggle = $('#activity-block-toggle')?.closest('label');
+	if (!toggle) return;
+	toggle.insertAdjacentHTML('beforebegin', '<label>Notas<textarea id="activity-notes" rows="3" placeholder="Detalles que quieras recordar"></textarea></label><label>Cuidados especiales<textarea id="activity-care" rows="3" placeholder="Indicaciones, preparación o cuidados posteriores"></textarea></label>');
+}
 
 function titleCase(value) { return value.trim().replace(/\b\w/g, letter => letter.toUpperCase()); }
 function categoryKey(value) { return value.trim().toLowerCase().replace(/\s+/g, ' '); }
@@ -28,6 +37,40 @@ let calendarView = 'week';
 let editingEventId = null;
 let selectedEventId = null;
 function persist() { localStorage.setItem('ritmo-activities', JSON.stringify(activities)); localStorage.setItem('ritmo-events', JSON.stringify(events)); localStorage.setItem('ritmo-category-colors', JSON.stringify(categoryColors)); localStorage.setItem('ritmo-custom-categories', JSON.stringify(customCategories)); localStorage.setItem('ritmo-name-colors', JSON.stringify(nameColors)); localStorage.setItem('ritmo-semesters', JSON.stringify(semesters)); }
+function excelDate(value) { return value instanceof Date ? value.toISOString().slice(0, 10) : String(value || '').slice(0, 10); }
+function excelTime(value) { if (value instanceof Date) return value.toTimeString().slice(0, 5); return String(value || '').slice(0, 5); }
+function excelSheet(workbook, name, rows) { const sheet = XLSX.utils.json_to_sheet(rows); if (workbook.SheetNames.includes(name)) workbook.Sheets[name] = sheet; else XLSX.utils.book_append_sheet(workbook, sheet, name); }
+function exportExcel() {
+	const workbook = XLSX.utils.book_new();
+	excelSheet(workbook, 'Actividades', activities.map(activity => ({ id: activity.id, nombre: activity.name, categoria: activity.category, tipo: activity.type, procedimiento: activity.medicalKind || '', inicio: activity.horaInicio, fin: activity.horaFin, recuperacion_horas: activity.recoveryHours || 0, notas: activity.notes || '', cuidados: activity.careNotes || '', icono: activity.icon || '', semestre_id: activity.semesterId || '', materia_id: activity.subjectId || '', bloque_id: activity.blockId || '' })));
+	excelSheet(workbook, 'Eventos', events.map(event => ({ id: event.id, actividad_id: event.activityId, fecha: event.date, inicio: event.horaInicio, fin: event.horaFin, semestre_id: event.semesterId || '', materia_id: event.subjectId || '', bloque_id: event.blockId || '' })));
+	excelSheet(workbook, 'Categorias', allCategories().map(key => ({ clave: key, nombre: categoryLabels[key] || titleCase(key), color: categoryColors[key], es_fija: Boolean(fixedCategories[key]) })));
+	excelSheet(workbook, 'Semestres', semesters.map(semester => ({ id: semester.id, nombre: semester.name, inicio: semester.start, fin: semester.end })));
+	excelSheet(workbook, 'Materias', semesters.flatMap(semester => semester.subjects.map(subject => ({ id: subject.id, semestre_id: semester.id, nombre: subject.name }))));
+	const blockRows = semesters.flatMap(semester => semester.subjects.flatMap(subject => [...(subject.blocks || []).map(block => ({ ...block, tipo: 'theory' })), ...(subject.labBlocks || []).map(block => ({ ...block, tipo: 'lab' }))].map(block => ({ id: block.id || '', materia_id: subject.id, tipo: block.tipo, dia: block.day, inicio: block.start, fin: block.end }))));
+	excelSheet(workbook, 'Bloques', blockRows);
+	XLSX.writeFile(workbook, `ritmo-${new Date().toISOString().slice(0, 10)}.xlsx`);
+	syncStatus('Excel guardado');
+}
+async function importExcel(file) {
+	const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+	const rows = name => workbook.Sheets[name] ? XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' }) : [];
+	const activityRows = rows('Actividades');
+	const eventRows = rows('Eventos');
+	if (!activityRows.length && !eventRows.length) throw new Error('El archivo no contiene hojas de actividades o eventos.');
+	activities = activityRows.map(row => ({ id: String(row.id || `activity-${Date.now()}-${Math.random()}`), name: String(row.nombre || ''), category: categoryKey(row.categoria || 'otros'), type: String(row.tipo || 'Actividad'), medicalKind: String(row.procedimiento || ''), horaInicio: excelTime(row.inicio), horaFin: excelTime(row.fin), recoveryHours: Number(row.recuperacion_horas) || 0, notes: String(row.notas || ''), careNotes: String(row.cuidados || ''), icon: String(row.icono || '•'), semesterId: String(row.semestre_id || '') || undefined, subjectId: String(row.materia_id || '') || undefined, blockId: String(row.bloque_id || '') || undefined, care: row.tipo === 'Procedimiento médico' }));
+	events = eventRows.map(row => ({ id: String(row.id || `event-${Date.now()}-${Math.random()}`), activityId: String(row.actividad_id || ''), date: excelDate(row.fecha), horaInicio: excelTime(row.inicio), horaFin: excelTime(row.fin), semesterId: String(row.semestre_id || '') || undefined, subjectId: String(row.materia_id || '') || undefined, blockId: String(row.bloque_id || '') || undefined })).filter(event => activities.some(activity => activity.id === event.activityId));
+	Object.keys(customCategories).forEach(key => { delete customCategories[key]; delete categoryColors[key]; delete categoryLabels[key]; });
+	rows('Categorias').forEach(row => { const key = categoryKey(row.clave || row.nombre); if (!fixedCategories[key]) { categoryColors[key] = String(row.color || palette[0]); categoryLabels[key] = String(row.nombre || titleCase(key)); customCategories[key] = { name: categoryLabels[key], color: categoryColors[key] }; } });
+	const semesterRows = rows('Semestres');
+	const subjectRows = rows('Materias');
+	const blockRows = rows('Bloques');
+	semesters = semesterRows.map(row => ({ id: String(row.id), name: String(row.nombre || ''), start: excelDate(row.inicio), end: excelDate(row.fin), subjects: subjectRows.filter(subject => String(subject.semestre_id) === String(row.id)).map(subject => ({ id: String(subject.id), name: String(subject.nombre || ''), blocks: blockRows.filter(block => String(block.materia_id) === String(subject.id) && block.tipo !== 'lab').map(block => ({ id: String(block.id || ''), day: Number(block.dia), start: excelTime(block.inicio), end: excelTime(block.fin) })), labBlocks: blockRows.filter(block => String(block.materia_id) === String(subject.id) && block.tipo === 'lab').map(block => ({ id: String(block.id || ''), day: Number(block.dia), start: excelTime(block.inicio), end: excelTime(block.fin) })) })) }));
+	activities.forEach(activity => ensureCategory(activity.category));
+	persist();
+	renderAll();
+	syncStatus('Excel importado');
+}
 function parseMinutes(value) { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; }
 function addMinutes(time, amount) { const total = (parseMinutes(time) + amount) % 1440; return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(Math.round(total % 60)).padStart(2, '0')}`; }
 function durationHours(activity) { let minutes = parseMinutes(activity.horaFin) - parseMinutes(activity.horaInicio); if (minutes <= 0) minutes += 1440; return minutes / 60; }
@@ -63,7 +106,7 @@ function fillCategoryOptions() { $('#activity-category').innerHTML = `<option va
 function recoverySuggestion(kind) { return { 'Procedimiento ambulatorio': 24, 'Cirugía menor': 72, 'Cirugía mayor': 336 }[kind] || 24; }
 function updateMedicalFields() { const isMedical = $('#activity-type').value === 'Procedimiento médico'; $('#medical-fields').classList.toggle('visible', isMedical); if (isMedical) $('#recovery-hours').value = recoverySuggestion($('#medical-kind').value); updateDurationPreview(); }
 function updateDurationPreview() { const start = $('#activity-start').value; const end = $('#activity-end').value; if (!start || !end) return; const fake = { horaInicio: start, horaFin: end }; $('#duration-preview').textContent = `Duración calculada: ${hoursLabel(durationHours(fake))}${$('#activity-type').value === 'Procedimiento médico' ? ` + ${hoursLabel(Number($('#recovery-hours').value) || 0)} de recuperación` : ''}`; }
-function openModal(eventId = null) { editingEventId = eventId; $('#modal-title').textContent = eventId ? 'Editar actividad' : 'Nueva actividad'; $('#modal-backdrop').classList.add('open'); $('#booking-feedback').className = 'booking-feedback'; $('#booking-feedback').textContent = ''; fillCategoryOptions(); if (eventId) { const detail = eventDetails(events.find(event => event.id === eventId)); $('#activity-name').value = detail.activity.name; $('#activity-category').value = detail.activity.category; $('#activity-type').value = detail.activity.type; $('#activity-date').value = detail.date; $('#activity-start').value = detail.horaInicio; $('#activity-end').value = detail.horaFin; $('#recovery-hours').value = detail.activity.recoveryHours || 0; } else { $('#activity-form').reset(); $('#activity-category').value = ''; $('#activity-block-fields').classList.remove('visible'); } updateMedicalFields(); }
+function openModal(eventId = null) { ensureAdditionalActivityFields(); editingEventId = eventId; $('#modal-title').textContent = eventId ? 'Editar actividad' : 'Nueva actividad'; $('#modal-backdrop').classList.add('open'); $('#booking-feedback').className = 'booking-feedback'; $('#booking-feedback').textContent = ''; fillCategoryOptions(); if (eventId) { const detail = eventDetails(events.find(event => event.id === eventId)); $('#activity-name').value = detail.activity.name; $('#activity-category').value = detail.activity.category; $('#activity-type').value = detail.activity.type; $('#activity-date').value = detail.date; $('#activity-start').value = detail.horaInicio; $('#activity-end').value = detail.horaFin; $('#recovery-hours').value = detail.activity.recoveryHours || 0; $('#activity-notes').value = detail.activity.notes || ''; $('#activity-care').value = detail.activity.careNotes || ''; } else { $('#activity-form').reset(); $('#activity-date').value = localDate(new Date()); $('#activity-category').value = ''; $('#activity-block-fields').classList.remove('visible'); } updateMedicalFields(); }
 function closeModal() { $('#modal-backdrop').classList.remove('open'); }
 function scopeForGenerated(action) { return window.prompt(`Esta actividad viene de un bloque semestral. Escribe "solo" para aplicar ${action} a esta ocurrencia o "todo" para aplicar a todas las semanas.`) === 'todo' ? 'all' : 'one'; }
 function bindEventActionsLegacy() { document.querySelectorAll('[data-edit-event]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); openModal(button.dataset.editEvent); })); document.querySelectorAll('[data-delete-event]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); deleteEvent(button.dataset.deleteEvent); })); document.querySelectorAll('.month-event').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); openModal(button.dataset.eventId); })); document.querySelectorAll('.cal-event, .activity-card').forEach(element => element.addEventListener('click', event => { if (event.target.closest('button')) return; const id = element.dataset.eventId; if (id) openModal(id); })); }
@@ -121,14 +164,14 @@ async function loadCloudData(allowMigration = true) {
 	Object.keys(customCategories).forEach(key => delete customCategories[key]);
 	Object.keys(categoryRowIds).forEach(key => delete categoryRowIds[key]);
 	(categoryResult.data || []).forEach(row => { const key = categoryKeyForRow(row); categoryRowIds[key] = row.id; categoryColors[key] = row.color; categoryLabels[key] = row.name; if (!row.is_system) customCategories[key] = { name: row.name, color: row.color }; });
-	if (!remoteActivities.length && !remoteEvents.length && allowMigration && activities.length) { normalizeCloudIds(); await syncCloudData(); syncStatus('Sincronizado ahora'); return; }
+	if (!remoteActivities.length && !remoteEvents.length && allowMigration && activities.length && localStorage.getItem('ritmo-cloud-owner') === cloudUser.id) { normalizeCloudIds(); await syncCloudData(); syncStatus('Sincronizado ahora'); return; }
 	const remoteSemesters = semesterResult.data || [];
 	const remoteSubjects = subjectResult.data || [];
 	const remoteBlocks = blockResult.data || [];
 	semesters = remoteSemesters.map(row => ({ id: row.id, name: row.name, start: row.start_date, end: row.end_date, subjects: remoteSubjects.filter(subject => subject.semester_id === row.id).map(subject => ({ id: subject.id, name: subject.name, blocks: remoteBlocks.filter(block => block.subject_id === subject.id && block.block_type === 'theory').map(block => ({ id: block.id, day: block.weekday, start: block.start_time.slice(0, 5), end: block.end_time.slice(0, 5) })), labBlocks: remoteBlocks.filter(block => block.subject_id === subject.id && block.block_type === 'lab').map(block => ({ id: block.id, day: block.weekday, start: block.start_time.slice(0, 5), end: block.end_time.slice(0, 5) })) })) }));
-	activities = remoteActivities.map(row => ({ id: row.id, name: row.name, category: categoryKeyForRow((categoryResult.data || []).find(category => category.id === row.category_id) || { name: 'Otros' }), type: row.activity_type, medicalKind: row.medical_kind, horaInicio: row.start_time.slice(0, 5), horaFin: row.end_time.slice(0, 5), recoveryHours: row.recovery_hours || 0, notes: row.notes, icon: row.icon, semesterId: row.semester_id, subjectId: row.subject_id, blockId: row.block_id, care: row.activity_type === 'Procedimiento médico' }));
+	activities = remoteActivities.map(row => ({ id: row.id, name: row.name, category: categoryKeyForRow((categoryResult.data || []).find(category => category.id === row.category_id) || { name: 'Otros' }), type: row.activity_type, medicalKind: row.medical_kind, horaInicio: row.start_time.slice(0, 5), horaFin: row.end_time.slice(0, 5), recoveryHours: row.recovery_hours || 0, notes: row.notes, careNotes: row.care_notes || '', prepMinutes: row.prep_minutes || 0, icon: row.icon, semesterId: row.semester_id, subjectId: row.subject_id, blockId: row.block_id, care: row.activity_type === 'Procedimiento médico' }));
 	events = remoteEvents.map(row => ({ id: row.id, activityId: row.activity_id, date: row.event_date, horaInicio: row.start_time.slice(0, 5), horaFin: row.end_time.slice(0, 5) }));
-	localPersist(); renderAll(); syncStatus('Sincronizado ahora');
+	localStorage.setItem('ritmo-cloud-owner', cloudUser.id); localPersist(); renderAll(); syncStatus('Sincronizado ahora');
 }
 async function syncCloudData() {
 	if (!cloudUser) return;
@@ -142,11 +185,20 @@ async function syncCloudData() {
 	activities.forEach(activity => { if (activity.semesterId && semesterIds.has(activity.semesterId)) activity.semesterId = semesterIds.get(activity.semesterId); if (activity.subjectId && subjectIds.has(activity.subjectId)) activity.subjectId = subjectIds.get(activity.subjectId); if (activity.blockId && blockIds.has(activity.blockId)) activity.blockId = blockIds.get(activity.blockId); else if (activity.blockId && !uuidPattern.test(activity.blockId)) activity.blockId = null; });
 	const categories = allCategories().map(key => ({ id: categoryRowIds[key] || crypto.randomUUID(), user_id: cloudUser.id, name: categoryLabels[key] || titleCase(key), color: categoryColors[key], is_system: Boolean(fixedCategories[key]) }));
 	categories.forEach(row => { categoryRowIds[categoryKey(row.name)] = row.id; });
-	const activityRows = activities.map(activity => ({ id: activity.id, user_id: cloudUser.id, category_id: categoryRowIds[activity.category] || categoryRowIds.otros, name: activity.name, activity_type: activity.type || 'Actividad', medical_kind: activity.medicalKind || null, start_time: activity.horaInicio, end_time: activity.horaFin, recovery_hours: activity.recoveryHours || 0, notes: activity.notes || null, icon: activity.icon || null, semester_id: activity.semesterId || null, subject_id: activity.subjectId || null, block_id: activity.blockId || null }));
+	const activityRows = activities.map(activity => ({ id: activity.id, user_id: cloudUser.id, category_id: categoryRowIds[activity.category] || categoryRowIds.otros, name: activity.name, activity_type: activity.type || 'Actividad', medical_kind: activity.medicalKind || null, start_time: activity.horaInicio, end_time: activity.horaFin, recovery_hours: activity.recoveryHours || 0, notes: activity.notes || null, care_notes: activity.careNotes || null, prep_minutes: activity.prepMinutes || 0, icon: activity.icon || null, semester_id: activity.semesterId || null, subject_id: activity.subjectId || null, block_id: activity.blockId || null }));
 	const eventRows = events.map(event => ({ id: event.id, user_id: cloudUser.id, activity_id: event.activityId, event_date: event.date, start_time: event.horaInicio, end_time: event.horaFin, is_generated: Boolean(event.blockId || event.subjectId) }));
 	const categoryUpsert = await supabase.from('categories').upsert(categories);
 	const semesterUpsert = await supabase.from('semesters').upsert(semesterRows);
 	const subjectRows = semesters.flatMap(semester => semester.subjects.map(subject => ({ id: subject.id, user_id: cloudUser.id, semester_id: semester.id, name: subject.name, has_lab: Boolean(subject.labBlocks?.length) })));
+	const removeStaleRows = async (table, rows) => {
+		const ids = rows.map(row => row.id);
+		const query = supabase.from(table).delete().eq('user_id', cloudUser.id);
+		return ids.length ? query.not('id', 'in', `(${ids.join(',')})`) : query;
+	};
+	for (const [table, rows] of [['events', eventRows], ['activities', activityRows], ['schedule_blocks', blockRows], ['subjects', subjectRows], ['semesters', semesterRows], ['categories', categories]]) {
+		const result = await removeStaleRows(table, rows);
+		if (result.error) { syncStatus('Error al limpiar datos sincronizados'); return; }
+	}
 	const subjectUpsert = await supabase.from('subjects').upsert(subjectRows);
 	const blockUpsert = await supabase.from('schedule_blocks').upsert(blockRows);
 	const activityUpsert = await supabase.from('activities').upsert(activityRows);
@@ -170,6 +222,16 @@ $('#auth-form').addEventListener('submit', async event => { event.preventDefault
 $('#logout-button').addEventListener('click', async () => { await supabase.auth.signOut(); setAuthenticated(null); });
 supabase.auth.onAuthStateChange((event, session) => { if (event === 'PASSWORD_RECOVERY') { isPasswordRecovery = true; authMode = 'login'; renderAuthMode(); setAuthenticated(null); return; } if (event === 'SIGNED_OUT') isPasswordRecovery = false; setAuthenticated(session?.user || null); });
 supabase.auth.getSession().then(({ data }) => setAuthenticated(data.session?.user || null));
+
+$('#export-excel').addEventListener('click', exportExcel);
+$('#import-excel').addEventListener('click', () => $('#excel-file').click());
+$('#excel-file').addEventListener('change', async event => {
+	const [file] = event.target.files;
+	if (!file) return;
+	if (!window.confirm('Importar este archivo reemplazará las actividades y eventos actuales. ¿Continuar?')) { event.target.value = ''; return; }
+	try { await importExcel(file); } catch (error) { syncStatus('Error al importar Excel'); window.alert(error.message || 'No se pudo importar el archivo.'); }
+	event.target.value = '';
+});
 renderAuthMode();
 
 function timeOptions(selected = '09:00') { const options = []; for (let minutes = 0; minutes < 1440; minutes += 15) { const value = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`; options.push(`<option value="${value}" ${value === selected ? 'selected' : ''}>${value}</option>`); } return options.join(''); }
@@ -198,9 +260,26 @@ renderAll();
 // Calendario preciso: una celda por hora, eventos posicionados por minuto y columnas para solapes.
 function eventOverlaps(first, second) { return eventTimestamp(first) < eventTimestamp(second, true) && eventTimestamp(second) < eventTimestamp(first, true); }
 function eventLayout(event, dayEvents) { const overlaps = dayEvents.filter(other => other.id !== event.id && eventOverlaps(event, other)); const group = [event, ...overlaps].sort((first, second) => eventTimestamp(first) - eventTimestamp(second)); const index = Math.max(0, group.findIndex(item => item.id === event.id)); return { index, total: Math.max(1, group.length) }; }
-function showEventDetail(eventId) { const event = events.find(item => item.id === eventId); const detail = eventDetails(event); if (!event || !detail.activity) return; selectedEventId = eventId; $('#event-detail-title').textContent = detail.activity.name; $('#event-detail-meta').innerHTML = `<div><strong>Categoría:</strong> ${categoryLabels[detail.activity.category] || titleCase(detail.activity.category)}</div><div><strong>Horario:</strong> ${detail.horaInicio}–${detail.horaFin}</div><div><strong>Fecha:</strong> ${formatDate(detail.date)}</div><div><strong>Notas:</strong> ${detail.activity.notes || 'Sin notas'}</div>${detail.activity.type === 'Procedimiento médico' ? `<div><strong>Cuidados especiales:</strong> recuperación de ${hoursLabel(detail.activity.recoveryHours || 0)}</div>` : ''}`; $('#event-detail-backdrop').classList.add('open'); }
+function showEventDetail(eventId) { const event = events.find(item => item.id === eventId); const detail = eventDetails(event); if (!event || !detail.activity) return; selectedEventId = eventId; $('#event-detail-title').textContent = detail.activity.name; $('#event-detail-meta').innerHTML = `<div><strong>Categoría:</strong> ${categoryLabels[detail.activity.category] || titleCase(detail.activity.category)}</div><div><strong>Horario:</strong> ${detail.horaInicio}–${detail.horaFin}</div><div><strong>Fecha:</strong> ${formatDate(detail.date)}</div><div><strong>Notas:</strong> ${detail.activity.notes || 'Sin notas'}</div><div><strong>Cuidados especiales:</strong> ${detail.activity.careNotes || (detail.activity.type === 'Procedimiento médico' ? `Recuperación de ${hoursLabel(detail.activity.recoveryHours || 0)}` : 'Sin cuidados especiales')}</div>`; $('#event-detail-backdrop').classList.add('open'); }
 function closeEventDetail() { $('#event-detail-backdrop').classList.remove('open'); selectedEventId = null; }
 function bindEventActions() { document.querySelectorAll('[data-edit-event]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); openModal(button.dataset.editEvent); })); document.querySelectorAll('[data-delete-event]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); deleteEvent(button.dataset.deleteEvent); })); document.querySelectorAll('.month-event').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); showEventDetail(button.dataset.eventId); })); document.querySelectorAll('.cal-event, .activity-card').forEach(element => element.addEventListener('click', event => { if (event.target.closest('button')) return; const id = element.dataset.eventId; if (id) showEventDetail(id); })); }
 function renderCalendar() { const grid = $('#calendar-grid'); const selected = activeCategories(); const singleCategory = selected.length === 1; const viewDates = datesForView(); updateCalendarLabel(viewDates); document.querySelectorAll('.view-switcher button').forEach(button => button.classList.toggle('selected', button.dataset.calendarView === calendarView)); if (calendarView === 'month') { renderMonth(viewDates, selected); bindEventActions(); return; } grid.className = 'calendar-grid'; grid.innerHTML = '<div class="day-head"></div>'; viewDates.forEach(date => { const day = new Date(`${date}T12:00:00`); const dayIndex = (day.getDay() + 6) % 7; grid.innerHTML += `<div class="day-head ${localDate(currentDate) === date ? 'today' : ''}"><span class="day-name">${dayNames[dayIndex]}</span><strong>${day.getDate()}</strong></div>`; }); for (let hour = 0; hour < 24; hour += 1) { const time = `${String(hour).padStart(2, '0')}:00`; grid.innerHTML += `<div class="time-label">${time}</div>`; viewDates.forEach(date => { const dayEvents = events.map(eventDetails).filter(event => event.activity && event.date === date && selected.includes(event.activity.category)); const matching = dayEvents.filter(event => event.horaInicio.slice(0, 2) === String(hour).padStart(2, '0')); const content = matching.map(item => { const offset = parseMinutes(item.horaInicio) % 60; const height = Math.max(28, durationHours(item.activity) * 75 - 6); const layout = eventLayout(item, dayEvents); const color = eventColor(item.activity, singleCategory ? 1 : selected.length); return `<div class="cal-event-wrap" style="top:${offset}px;height:${height}px;left:calc(${layout.index} * ${100 / layout.total}%);width:calc(${100 / layout.total}% - 4px)"><div class="cal-event" style="background:${color};border-left-color:${color}" title="${item.activity.name}" data-event-id="${item.id}"><strong>${item.activity.name}</strong><small>${item.horaInicio}–${item.horaFin}</small></div></div>`; }).join(''); const recovery = dayEvents.find(event => recoveryDates(event).includes(date)); grid.innerHTML += `<div class="cal-slot">${content || (recovery && hour === 0 ? '<div class="cal-block">recuperación médica</div>' : '')}</div>`; }); } bindEventActions(); }
 $('#close-event-detail').addEventListener('click', closeEventDetail); $('#event-detail-backdrop').addEventListener('click', event => { if (event.target.id === 'event-detail-backdrop') closeEventDetail(); }); $('#edit-event-detail').addEventListener('click', () => { const eventId = selectedEventId; closeEventDetail(); if (eventId) openModal(eventId); }); $('#delete-event-detail').addEventListener('click', () => { const eventId = selectedEventId; closeEventDetail(); if (eventId) deleteEvent(eventId); }); $('.insight-action').addEventListener('click', () => { document.querySelector('[data-view="resumen"]').click(); setTimeout(() => $('#availability-panel').scrollIntoView({ behavior: 'smooth' }), 0); });
+ensureAdditionalActivityFields();
+let submittedActivityDetails = null;
+$('#activity-form').addEventListener('submit', () => {
+	submittedActivityDetails = { notes: $('#activity-notes').value.trim(), careNotes: $('#activity-care').value.trim(), editingEventId };
+	setTimeout(() => {
+		if (!submittedActivityDetails || $('#booking-feedback').classList.contains('error')) return;
+		const targetEvent = submittedActivityDetails.editingEventId ? events.find(item => item.id === submittedActivityDetails.editingEventId) : events[events.length - 1];
+		const target = targetEvent && activities.find(item => item.id === targetEvent.activityId);
+		if (target) {
+			target.notes = submittedActivityDetails.notes;
+			target.careNotes = submittedActivityDetails.careNotes;
+			persist();
+			renderAll();
+		}
+		submittedActivityDetails = null;
+	}, 0);
+});
 renderAll();

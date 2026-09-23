@@ -81,6 +81,8 @@ create table if not exists public.activities (
   end_time time not null,
   recovery_hours integer not null default 0 check (recovery_hours >= 0),
   notes text,
+  care_notes text,
+  prep_minutes integer not null default 0 check (prep_minutes >= 0),
   icon text,
   semester_id uuid references public.semesters(id) on delete cascade,
   subject_id uuid references public.subjects(id) on delete cascade,
@@ -103,6 +105,9 @@ create table if not exists public.events (
   updated_at timestamptz not null default now(),
   check (start_time <> end_time)
 );
+
+alter table public.activities add column if not exists care_notes text;
+alter table public.activities add column if not exists prep_minutes integer not null default 0;
 
 create index if not exists categories_user_id_idx on public.categories(user_id);
 create index if not exists semesters_user_id_idx on public.semesters(user_id);
