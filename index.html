@@ -95,6 +95,20 @@
       .confirm-scope label { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 12px; }
       .confirm-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
       .confirm-actions .danger-button { background: #c9654e; color: white; padding: 11px 15px; border-radius: 5px; font-size: 12px; font-weight: 700; }
+      .auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--paper); }
+      .auth-card { width: min(100%, 420px); background: var(--white); border: 1px solid var(--line); border-radius: 9px; padding: 36px; box-shadow: 0 18px 50px rgba(37,37,34,.08); }
+      .auth-card .brand { margin-bottom: 38px; }
+      .auth-card h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -1.5px; }
+      .auth-card .auth-copy { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 24px; }
+      .auth-card label { display: block; margin: 15px 0; color: #66645c; font-size: 11px; font-weight: 700; }
+      .auth-card input { display: block; width: 100%; margin-top: 7px; padding: 12px; border: 1px solid var(--line); border-radius: 5px; background: #faf9f5; }
+      .auth-switch { border: 0; background: transparent; color: var(--coral-dark); font-size: 11px; padding: 15px 0 0; }
+      .auth-message { min-height: 18px; font-size: 11px; line-height: 1.5; margin-top: 14px; }
+      .auth-message.error { color: var(--coral-dark); }
+      .auth-message.success { color: var(--sage-deep); }
+      .app-shell.auth-hidden { display: none; }
+      .top-user { display: flex; align-items: center; gap: 10px; }
+      .logout-button { background: transparent; color: var(--muted); font-size: 11px; padding: 0; }
       #subject-form .section-heading { justify-content: space-between; margin-top: 20px; }
       #subject-form .section-heading h3 { font-size: 13px; margin: 0; }
       @media (max-width: 600px) { .time-fields { grid-template-columns: 1fr; gap: 0; } }
@@ -102,7 +116,23 @@
     </style>
   </head>
   <body>
-    <div class="app-shell">
+    <section class="auth-screen" id="auth-screen">
+      <div class="auth-card">
+        <div class="brand"><span class="brand-mark">r</span><span>ritmo</span></div>
+        <p class="eyebrow" id="auth-eyebrow">Tu agenda, contigo.</p>
+        <h1 id="auth-title">Bienvenido a Ritmo</h1>
+        <p class="auth-copy" id="auth-copy">Inicia sesión para acceder a tu agenda y mantenerla sincronizada entre tus dispositivos.</p>
+        <form id="auth-form">
+          <label>Correo electrónico<input id="auth-email" type="email" autocomplete="email" required /></label>
+          <label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required /></label>
+          <button class="primary-button full-width" id="auth-submit" type="submit">Iniciar sesión <span>→</span></button>
+        </form>
+        <button class="auth-switch" id="auth-switch" type="button">¿No tienes cuenta? Crear una</button>
+        <button class="auth-switch" id="auth-forgot" type="button">¿Olvidaste tu contraseña?</button>
+        <div class="auth-message" id="auth-message" role="status"></div>
+      </div>
+    </section>
+    <div class="app-shell auth-hidden" id="app-shell">
       <aside class="sidebar">
         <div class="brand"><span class="brand-mark">r</span><span>ritmo</span></div>
         <div class="workspace-switcher"><span class="avatar avatar-sage">LM</span><span><strong>Laura M.</strong><small>Mi agenda</small></span><span class="chevron">⌄</span></div>
@@ -116,7 +146,7 @@
       </aside>
 
       <main class="main-content">
-        <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">r</span><span>ritmo</span></div><div class="breadcrumb"><span>Mi agenda</span><span class="slash">/</span><strong id="page-label">Esta semana</strong></div><div class="top-actions"><button class="icon-button" aria-label="Buscar">⌕</button><button class="notification-button" aria-label="Notificaciones"><span>♢</span><i></i></button><span class="avatar avatar-coral">LM</span></div></header>
+        <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">r</span><span>ritmo</span></div><div class="breadcrumb"><span>Mi agenda</span><span class="slash">/</span><strong id="page-label">Esta semana</strong></div><div class="top-actions"><button class="icon-button" aria-label="Buscar">⌕</button><button class="notification-button" aria-label="Notificaciones"><span>♢</span><i></i></button><div class="top-user"><span class="avatar avatar-coral" id="user-avatar">LM</span><button class="logout-button" id="logout-button" type="button">Cerrar sesión</button></div></div></header>
 
         <div id="agenda-view" class="view active-view">
           <section class="hero-row"><div><p class="eyebrow">Martes, 22 de septiembre de 2026</p><h1>Tu semana, <em>a tu ritmo.</em></h1><p class="hero-copy">Aquí tienes el espacio real que te queda para lo que importa.</p></div><button class="primary-button" id="open-modal"><span>＋</span> Nueva actividad</button></section>

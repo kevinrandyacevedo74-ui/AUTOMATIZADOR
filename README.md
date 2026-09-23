@@ -13,6 +13,26 @@ npm run dev
 
 La conexión inicial con Supabase usa `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` en `.env.local`. No uses una clave `service_role` en el navegador.
 
+### Autenticación
+
+La aplicación ya incluye:
+
+- Inicio de sesión con correo y contraseña.
+- Registro de nuevas cuentas.
+- Recuperación de contraseña por correo.
+- Sesión persistente en el navegador.
+- Cierre de sesión.
+- Bloqueo de la agenda hasta autenticar al usuario.
+
+En Supabase activa **Authentication → Providers → Email**. En **Authentication → URL Configuration** agrega como Site URL y Redirect URL la URL final de Netlify, por ejemplo `https://tu-sitio.netlify.app/`.
+
+En Netlify configura estas variables en **Site configuration → Environment variables**:
+
+```text
+VITE_SUPABASE_URL=https://gkyhlveuooxjdodyiztp.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=tu_clave_publishable
+```
+
 ## Desplegar en Netlify
 
 Este proyecto ya incluye `netlify.toml` con la configuración de Vite:

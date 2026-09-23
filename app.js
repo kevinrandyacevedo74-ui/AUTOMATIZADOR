@@ -1,3 +1,5 @@
+import { supabase } from './supabase-client.js';
+
 const dayNames = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 const times = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 const categoryLabels = {};
@@ -91,6 +93,18 @@ $('#previous-period').addEventListener('click', () => changePeriod(-1)); $('#nex
 function renderAll() { renderFilters(); renderCalendar(); renderActivities(); renderSummary(); renderCategoryManager(); renderSemesters(); fillCategoryOptions(); }
 document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active')); button.classList.add('active'); document.querySelectorAll('.view').forEach(view => view.classList.remove('active-view')); $(`#${button.dataset.view}-view`).classList.add('active-view'); $('#page-label').textContent = button.dataset.view === 'agenda' ? 'Esta semana' : button.textContent.trim(); }));
 renderAll();
+
+let authMode = 'login';
+function setAuthMessage(message, type = '') { const element = $('#auth-message'); element.textContent = message; element.className = `auth-message ${type}`; }
+function setAuthenticated(user) { const isAuthenticated = Boolean(user); $('#auth-screen').style.display = isAuthenticated ? 'none' : 'grid'; $('#app-shell').classList.toggle('auth-hidden', !isAuthenticated); if (user?.email) { const initials = user.email.slice(0, 2).toUpperCase(); $('#user-avatar').textContent = initials; } }
+function renderAuthMode() { const register = authMode === 'register'; $('#auth-eyebrow').textContent = register ? 'Crear tu espacio' : 'Tu agenda, contigo.'; $('#auth-title').textContent = register ? 'Crea tu cuenta' : 'Bienvenido a Ritmo'; $('#auth-copy').textContent = register ? 'Guarda tu agenda en la nube y consúltala desde cualquier dispositivo.' : 'Inicia sesión para acceder a tu agenda y mantenerla sincronizada entre tus dispositivos.'; $('#auth-submit').innerHTML = register ? 'Crear cuenta <span>→</span>' : 'Iniciar sesión <span>→</span>'; $('#auth-switch').textContent = register ? '¿Ya tienes cuenta? Iniciar sesión' : '¿No tienes cuenta? Crear una'; $('#auth-password').autocomplete = register ? 'new-password' : 'current-password'; setAuthMessage(''); }
+$('#auth-switch').addEventListener('click', () => { authMode = authMode === 'login' ? 'register' : 'login'; renderAuthMode(); });
+$('#auth-forgot').addEventListener('click', async () => { const email = $('#auth-email').value.trim(); if (!email) { setAuthMessage('Escribe tu correo para recibir el enlace de recuperación.', 'error'); return; } const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` }); setAuthMessage(error ? error.message : 'Revisa tu correo para restablecer la contraseña.', error ? 'error' : 'success'); });
+$('#auth-form').addEventListener('submit', async event => { event.preventDefault(); const email = $('#auth-email').value.trim(); const password = $('#auth-password').value; const button = $('#auth-submit'); button.disabled = true; setAuthMessage('Conectando...'); const result = authMode === 'register' ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password }); button.disabled = false; if (result.error) { setAuthMessage(result.error.message, 'error'); return; } if (authMode === 'register' && !result.data.session) { setAuthMessage('Cuenta creada. Revisa tu correo para confirmar el acceso.', 'success'); return; } setAuthenticated(result.data.session?.user); });
+$('#logout-button').addEventListener('click', async () => { await supabase.auth.signOut(); setAuthenticated(null); });
+supabase.auth.onAuthStateChange((_event, session) => setAuthenticated(session?.user || null));
+supabase.auth.getSession().then(({ data }) => setAuthenticated(data.session?.user || null));
+renderAuthMode();
 
 function timeOptions(selected = '09:00') { const options = []; for (let minutes = 0; minutes < 1440; minutes += 15) { const value = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`; options.push(`<option value="${value}" ${value === selected ? 'selected' : ''}>${value}</option>`); } return options.join(''); }
 function replaceTimeInput(id) { const input = document.getElementById(id); if (!input || input.dataset.timePicker === 'true') return; const select = document.createElement('select'); select.id = id; select.required = input.required; select.className = 'time-select'; select.innerHTML = timeOptions(input.value || '09:00'); input.replaceWith(select); }
