@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f2ed" />
+    <title>Ritmo | Agenda inteligente</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .medical-fields { display: none; }
+      .medical-fields.visible { display: block; }
+      .time-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .cal-event { z-index: 3; }
+      .calendar-card { max-height: calc(100vh - 220px); overflow: auto; }
+      .calendar-grid { min-width: 720px; }
+      .cal-event-wrap { position: absolute !important; z-index: 3; }
+      .cal-event-wrap .cal-event { inset: 3px 2px; }
+      .page-actions, .section-heading { display: flex; align-items: center; gap: 10px; }
+      .page-actions { justify-content: flex-end; }
+      .study-panel, .category-manager, .semester-card { background: var(--white); border: 1px solid var(--line); border-radius: 7px; }
+      .study-panel { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 20px 22px; margin: 32px 0 14px; }
+      .study-panel h2 { margin: 0 0 5px; font-size: 17px; }
+      .study-panel p:not(.eyebrow) { color: var(--muted); margin: 0; font-size: 11px; }
+      .semester-list { display: grid; gap: 10px; margin-bottom: 14px; }
+      .semester-card { display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; }
+      .semester-card h3 { margin: 0 0 4px; font-size: 13px; }
+      .semester-card p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; }
+      .category-manager { padding: 18px 20px; margin-bottom: 22px; }
+      .category-manager .section-heading { justify-content: space-between; margin-bottom: 14px; }
+      .category-manager h2 { font-size: 14px; margin: 0; }
+      .category-manager .section-heading span { color: var(--muted); font-size: 10px; }
+      .category-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .category-chip { display: inline-flex; align-items: center; gap: 7px; background: #f0eee8; border-radius: 4px; padding: 7px 9px; font-size: 11px; }
+      .category-chip i { width: 8px; height: 8px; border-radius: 50%; }
+      .category-chip small { color: var(--muted); font-size: 9px; }
+      .category-chip button { background: transparent; color: var(--muted); padding: 0 0 0 3px; font-size: 15px; line-height: 12px; }
+      .wide-modal { max-width: 560px; }
+      .schedule-block { display: grid; grid-template-columns: 1fr 1fr 1fr auto; align-items: end; gap: 8px; padding: 10px; background: #f4f2ed; border-radius: 5px; margin: 8px 0; }
+      .schedule-block label { margin: 0; }
+      .schedule-block .icon-button { font-size: 18px; padding: 9px 3px; }
+      .event-actions, .card-actions { position: absolute; right: 5px; top: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity .15s ease; }
+      .cal-event:hover .event-actions, .activity-card:hover .card-actions { opacity: 1; }
+      .event-actions button, .card-actions button { background: rgba(255,255,255,.6); border-radius: 3px; padding: 2px 4px; font-size: 11px; }
+      .cal-event strong { display: block; padding-right: 30px; }
+      .cal-event-wrap { position: relative; }
+      .activity-card { cursor: pointer; }
+      .card-actions { color: var(--muted); }
+      .month-grid { grid-template-columns: repeat(7, 1fr); min-width: 0; }
+      .month-day-name { padding: 12px 7px; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 9px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .month-cell { min-height: 105px; padding: 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--white); }
+      .month-cell.muted { background: #f0eee8; }
+      .month-cell > strong { display: block; margin-bottom: 7px; font-size: 12px; }
+      .month-event { display: block; width: 100%; overflow: hidden; text-align: left; white-space: nowrap; text-overflow: ellipsis; margin: 3px 0; padding: 4px 5px; border-radius: 3px; color: #322e2a; font-size: 9px; }
+      .month-cell > small { color: var(--muted); font-size: 9px; }
+      .availability-panel { background: var(--white); border: 1px solid var(--line); border-radius: 7px; padding: 22px; margin-top: 22px; }
+      .availability-panel .section-heading { justify-content: space-between; margin-bottom: 12px; }
+      .availability-panel h2 { margin: 0; font-size: 15px; }
+      .availability-row { display: grid; grid-template-columns: 130px 1fr; gap: 15px; padding: 12px 0; border-bottom: 1px solid #edebe5; font-size: 11px; }
+      .availability-row strong { text-transform: capitalize; }
+      .availability-row span { color: var(--sage-deep); }
+      .sidebar-add-button { background: transparent; color: var(--muted); font-size: 11px; padding: 8px 0 0 22px; }
+      .sidebar-add-button:hover { color: var(--ink); }
+      .toggle-row { display: flex !important; align-items: center; gap: 8px; flex-direction: row !important; }
+      .toggle-row input { width: auto !important; margin: 0 !important; }
+      .weekday-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+      .weekday-picker label { display: flex; align-items: center; gap: 4px; background: #f0eee8; border-radius: 4px; padding: 7px; margin: 0; font-size: 10px; }
+      .weekday-picker input { width: auto !important; margin: 0 !important; }
+      .modal { max-height: 90vh; overflow-y: auto; }
+      .event-detail-modal { max-width: 390px; }
+      .event-detail-modal h2 { margin: 6px 0 12px; font-size: 24px; }
+      .event-detail-meta { display: grid; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+      .event-detail-meta strong { color: var(--ink); }
+      .detail-actions { display: flex; gap: 9px; }
+      .detail-actions .primary-button, .detail-actions .outline-button { flex: 1; justify-content: center; margin: 0; }
+      .insight-action { cursor: pointer; }
+      .now-line { position: absolute; z-index: 5; height: 2px; background: #e04f4f; pointer-events: none; box-shadow: 0 0 0 1px rgba(224,79,79,.12); }
+      .now-line::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #e04f4f; }
+      .time-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .time-picker select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 5px; background: #faf9f5; color: var(--ink); font-size: 12px; }
+      .day-activity-group { margin: 24px 0; }
+      .day-activity-group h2 { font-size: 14px; margin: 0 0 8px; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+      .day-activity-item { display: grid; grid-template-columns: 9px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #edebe5; }
+      .day-activity-item .category-dot { width: 8px; height: 8px; border-radius: 50%; }
+      .day-activity-item strong, .day-activity-item small { display: block; }
+      .day-activity-item strong { font-size: 12px; }
+      .day-activity-item small { color: var(--muted); font-size: 10px; margin-top: 3px; }
+      .confirm-modal { max-width: 420px; }
+      .confirm-modal h2 { margin: 5px 0 12px; font-size: 23px; }
+      .confirm-modal p { color: var(--muted); font-size: 12px; line-height: 1.55; }
+      .confirm-scope { display: none; padding: 12px; background: #f0eee8; border-radius: 5px; margin: 15px 0; }
+      .confirm-scope.visible { display: block; }
+      .confirm-scope label { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 12px; }
+      .confirm-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
+      .confirm-actions .danger-button { background: #c9654e; color: white; padding: 11px 15px; border-radius: 5px; font-size: 12px; font-weight: 700; }
+      #subject-form .section-heading { justify-content: space-between; margin-top: 20px; }
+      #subject-form .section-heading h3 { font-size: 13px; margin: 0; }
+      @media (max-width: 600px) { .time-fields { grid-template-columns: 1fr; gap: 0; } }
+      @media (max-width: 600px) { .page-heading, .study-panel { display: block; } .page-actions { justify-content: flex-start; margin-top: 20px; flex-wrap: wrap; } .study-panel .outline-button { margin-top: 15px; } .schedule-block { grid-template-columns: 1fr 1fr; } .month-cell { min-height: 82px; padding: 5px; } .availability-row { grid-template-columns: 1fr; gap: 5px; } .calendar-grid { min-width: 0; } .calendar-card { margin-right: -5vw; } }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">r</span><span>ritmo</span></div>
+        <div class="workspace-switcher"><span class="avatar avatar-sage">LM</span><span><strong>Laura M.</strong><small>Mi agenda</small></span><span class="chevron">⌄</span></div>
+        <nav class="main-nav" aria-label="Navegación principal">
+          <button class="nav-item active" data-view="agenda"><span class="nav-icon">◫</span>Agenda</button>
+          <button class="nav-item" data-view="actividades"><span class="nav-icon">✦</span>Actividades</button>
+          <button class="nav-item" data-view="resumen"><span class="nav-icon">◒</span>Resumen</button>
+        </nav>
+          <div class="sidebar-section"><p class="eyebrow">Mis calendarios</p><div id="calendar-filters"></div><button class="sidebar-add-button" id="open-category-sidebar">＋ Nueva categoría</button></div>
+        <div class="sidebar-bottom"><div class="sync-status"><span class="pulse"></span><span>Sincronizado ahora</span></div><button class="settings-button">⚙ <span>Ajustes</span></button></div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar"><div class="mobile-brand brand"><span class="brand-mark">r</span><span>ritmo</span></div><div class="breadcrumb"><span>Mi agenda</span><span class="slash">/</span><strong id="page-label">Esta semana</strong></div><div class="top-actions"><button class="icon-button" aria-label="Buscar">⌕</button><button class="notification-button" aria-label="Notificaciones"><span>♢</span><i></i></button><span class="avatar avatar-coral">LM</span></div></header>
+
+        <div id="agenda-view" class="view active-view">
+          <section class="hero-row"><div><p class="eyebrow">Martes, 22 de septiembre de 2026</p><h1>Tu semana, <em>a tu ritmo.</em></h1><p class="hero-copy">Aquí tienes el espacio real que te queda para lo que importa.</p></div><button class="primary-button" id="open-modal"><span>＋</span> Nueva actividad</button></section>
+          <section class="insight-strip"><div class="insight-icon">◌</div><div><strong>Buen margen esta semana</strong><p id="availability-insight">Calculando disponibilidad...</p></div><div class="insight-action">Ver espacios libres <span>→</span></div></section>
+          <div class="calendar-toolbar"><div class="view-switcher"><button class="selected" data-calendar-view="week">Semana</button><button data-calendar-view="month">Mes</button><button data-calendar-view="day">Día</button></div><div class="week-controls"><button class="round-button" id="previous-period" aria-label="Periodo anterior">‹</button><strong id="week-label"></strong><button class="round-button" id="next-period" aria-label="Periodo siguiente">›</button><button class="today-button" id="go-today">Hoy</button></div></div>
+          <section class="calendar-card"><div class="calendar-grid" id="calendar-grid"></div><div class="calendar-legend"><span><i class="legend-box free"></i> Disponible</span><span><i class="legend-box busy"></i> Ocupado</span><span><i class="legend-box recovery"></i> Recuperación / preparación</span></div></section>
+        </div>
+
+        <div id="actividades-view" class="view"><section class="page-heading"><div><p class="eyebrow">Base de conocimientos</p><h1>Actividades guardadas</h1><p class="hero-copy">Ritmo aprende cuánto espacio necesita cada cosa.</p></div><div class="page-actions"><button class="outline-button" id="open-category-modal">＋ Categoría</button><button class="primary-button" id="open-modal-activities"><span>＋</span> Nueva actividad</button></div></section><section class="study-panel"><div><p class="eyebrow">Estudio</p><h2>Materias del semestre</h2><p>Programa teoría y laboratorio; Ritmo genera todas las ocurrencias automáticamente.</p></div><button class="outline-button" id="open-semester-modal">＋ Nuevo semestre</button></section><section class="semester-list" id="semester-list"></section><section class="category-manager" id="category-manager"></section><section class="activity-layout"><div class="activity-list" id="activity-list"></div><aside class="knowledge-note"><span class="note-symbol">✦</span><h3>La duración real importa</h3><p>Incluimos preparación, traslado y recuperación para que una actividad nunca invada el tiempo de otra.</p></aside></section></div>
+
+        <div id="resumen-view" class="view"><section class="page-heading"><div><p class="eyebrow">Lectura de tu tiempo</p><h1>Resumen semanal</h1><p class="hero-copy">Una mirada rápida a cómo estás usando tus horas.</p></div><button class="outline-button" id="show-availability">Disponibilidad</button></section><section class="summary-grid" id="summary-grid"></section><section class="category-breakdown"><div class="section-heading"><h2>Distribución por categoría</h2><span>Tiempo ocupado</span></div><div id="category-bars"></div></section><section class="availability-panel" id="availability-panel"><div class="section-heading"><h2>Espacios libres</h2><span>Semana actual</span></div><div id="availability-list"></div></section></div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" id="close-modal" aria-label="Cerrar">×</button><p class="eyebrow">Planificar con intención</p><h2 id="modal-title">Nueva actividad</h2><p class="modal-intro">Ritmo calcula la duración desde la hora de inicio hasta la hora de fin.</p><form id="activity-form"><label>Nombre de la actividad<input id="activity-name" type="text" placeholder="Ej. Cálculo avanzado" required /></label><label>Categoría<select id="activity-category"><option value="">Sin categoría específica (Otros)</option></select></label><label>Tipo<select id="activity-type" required><option value="Actividad">Actividad</option><option value="Procedimiento médico">Procedimiento médico</option></select></label><div class="medical-fields" id="medical-fields"><label>Procedimiento<select id="medical-kind"><option value="Procedimiento ambulatorio">Procedimiento ambulatorio</option><option value="Cirugía menor">Cirugía menor</option><option value="Cirugía mayor">Cirugía mayor</option></select></label><label>Recuperación estimada (horas)<input id="recovery-hours" type="number" min="0" step="1" value="24" /></label></div><label>Fecha<input type="date" id="activity-date" value="2026-09-24" required /></label><div class="time-fields"><label>Hora de inicio<input type="time" id="activity-start" value="09:00" required /></label><label>Hora de fin<input type="time" id="activity-end" value="10:00" required /></label></div><label class="toggle-row"><input id="activity-block-toggle" type="checkbox" /> Repetir por bloques</label><div class="medical-fields" id="activity-block-fields"><div class="time-fields"><label>Fecha inicial<input type="date" id="activity-block-start" /></label><label>Fecha final<input type="date" id="activity-block-end" /></label></div><p class="form-footnote">Días de repetición</p><div class="weekday-picker"><label><input type="checkbox" value="1" /> Lun</label><label><input type="checkbox" value="2" /> Mar</label><label><input type="checkbox" value="3" /> Mié</label><label><input type="checkbox" value="4" /> Jue</label><label><input type="checkbox" value="5" /> Vie</label><label><input type="checkbox" value="6" /> Sáb</label><label><input type="checkbox" value="0" /> Dom</label></div></div><div class="form-footnote" id="duration-preview">Duración calculada: 1 h</div><button class="primary-button full-width" type="submit">Comprobar y agendar <span>→</span></button></form><div class="booking-feedback" id="booking-feedback"></div></section></div>
+    <div class="modal-backdrop" id="category-modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="category-modal-title"><button class="modal-close" id="close-category-modal" aria-label="Cerrar">×</button><p class="eyebrow">Personalización</p><h2 id="category-modal-title">Nueva categoría</h2><form id="category-form"><label>Nombre<input id="new-category-name" type="text" placeholder="Ej. Trabajo" required /></label><label>Color<input id="new-category-color" type="color" value="#83aabb" required /></label><button class="primary-button full-width" type="submit">Guardar categoría <span>→</span></button></form><div class="booking-feedback" id="category-feedback"></div></section></div>
+    <div class="modal-backdrop" id="event-detail-backdrop"><section class="modal event-detail-modal" role="dialog" aria-modal="true" aria-labelledby="event-detail-title"><button class="modal-close" id="close-event-detail" aria-label="Cerrar">×</button><p class="eyebrow">Detalle de actividad</p><h2 id="event-detail-title"></h2><div class="event-detail-meta" id="event-detail-meta"></div><div class="detail-actions"><button class="outline-button" id="delete-event-detail">Eliminar</button><button class="primary-button" id="edit-event-detail">¿Deseas modificar?</button></div></section></div>
+    <div class="modal-backdrop" id="delete-confirm-backdrop"><section class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title"><button class="modal-close" id="cancel-delete-x" aria-label="Cerrar">×</button><p class="eyebrow">Confirmar eliminación</p><h2 id="delete-confirm-title">¿Eliminar actividad?</h2><p id="delete-confirm-copy">Esta acción no se puede deshacer.</p><div class="confirm-scope" id="delete-scope"><strong>Esta actividad pertenece a un bloque.</strong><label><input type="radio" name="delete-scope" value="one" checked /> Solo esta ocurrencia</label><label><input type="radio" name="delete-scope" value="all" /> Todo el bloque</label></div><div class="confirm-actions"><button class="outline-button" id="cancel-delete">Cancelar</button><button class="danger-button" id="confirm-delete">Eliminar</button></div></section></div>
+    <div class="modal-backdrop" id="semester-modal-backdrop"><section class="modal wide-modal" role="dialog" aria-modal="true" aria-labelledby="semester-modal-title"><button class="modal-close" id="close-semester-modal" aria-label="Cerrar">×</button><p class="eyebrow">Planificación académica</p><h2 id="semester-modal-title">Nuevo semestre</h2><form id="semester-form"><label>Nombre del semestre<input id="semester-name" type="text" placeholder="Ej. 2027-1" required /></label><div class="time-fields"><label>Fecha de inicio<input id="semester-start" type="date" required /></label><label>Fecha de fin<input id="semester-end" type="date" required /></label></div><div id="subject-form"><div class="section-heading"><h3>Materia</h3><button class="outline-button" type="button" id="add-subject-block">＋ Bloque de teoría</button></div><label>Nombre de la materia<input id="subject-name" type="text" placeholder="Ej. Cálculo 3" required /></label><div id="theory-blocks"></div><label>¿Esta materia tiene laboratorio?<select id="has-lab"><option value="no">No</option><option value="si">Sí</option></select></label><div id="lab-blocks" class="medical-fields"><div class="section-heading"><h3>Bloques de laboratorio</h3><button class="outline-button" type="button" id="add-lab-block">＋ Bloque</button></div></div><button class="primary-button full-width" type="submit">Guardar materia y generar clases <span>→</span></button></div></form><div class="booking-feedback" id="semester-feedback"></div></section></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
