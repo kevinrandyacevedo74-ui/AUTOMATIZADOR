@@ -18,13 +18,14 @@ La conexión inicial con Supabase usa `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLI
 La aplicación ya incluye:
 
 - Inicio de sesión con correo y contraseña.
+- Inicio de sesión directo con Google.
 - Registro de nuevas cuentas.
 - Recuperación de contraseña por correo.
 - Sesión persistente en el navegador.
 - Cierre de sesión.
 - Bloqueo de la agenda hasta autenticar al usuario.
 
-En Supabase activa **Authentication → Providers → Email**. En **Authentication → URL Configuration** agrega como Site URL y Redirect URL la URL final de Netlify, por ejemplo `https://tu-sitio.netlify.app/`.
+En Supabase activa **Authentication → Providers → Email** y **Google**. En **Authentication → URL Configuration** agrega como Site URL y Redirect URL la URL final de Netlify, por ejemplo `https://tu-sitio.netlify.app/`. Para Google también tendrás que configurar las credenciales OAuth del proveedor en Supabase.
 
 En Netlify configura estas variables en **Site configuration → Environment variables**:
 
