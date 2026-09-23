@@ -94,6 +94,70 @@ function renderAll() { renderFilters(); renderCalendar(); renderActivities(); re
 document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active')); button.classList.add('active'); document.querySelectorAll('.view').forEach(view => view.classList.remove('active-view')); $(`#${button.dataset.view}-view`).classList.add('active-view'); $('#page-label').textContent = button.dataset.view === 'agenda' ? 'Esta semana' : button.textContent.trim(); }));
 renderAll();
 
+let cloudUser = null;
+let cloudChannel = null;
+const categoryRowIds = {};
+const localPersist = persist;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function cloudUuid(value) { return uuidPattern.test(value) ? value : crypto.randomUUID(); }
+function syncStatus(message) { const element = document.querySelector('.sync-status span:last-child'); if (element) element.textContent = message; }
+function normalizeCloudIds() { const activityIds = new Map(); activities.forEach(activity => { const oldId = activity.id; activity.id = cloudUuid(activity.id); if (oldId !== activity.id) activityIds.set(oldId, activity.id); }); events.forEach(event => { if (activityIds.has(event.activityId)) event.activityId = activityIds.get(event.activityId); event.id = cloudUuid(event.id); }); }
+function categoryKeyForRow(row) { return categoryKey(row.name); }
+async function loadCloudData(allowMigration = true) {
+	if (!cloudUser) return;
+	syncStatus('Sincronizando...');
+	const [categoryResult, activityResult, eventResult, semesterResult, subjectResult, blockResult] = await Promise.all([
+		supabase.from('categories').select('*').eq('user_id', cloudUser.id),
+		supabase.from('activities').select('*').eq('user_id', cloudUser.id),
+		supabase.from('events').select('*').eq('user_id', cloudUser.id),
+		supabase.from('semesters').select('*').eq('user_id', cloudUser.id),
+		supabase.from('subjects').select('*').eq('user_id', cloudUser.id),
+		supabase.from('schedule_blocks').select('*').eq('user_id', cloudUser.id),
+	]);
+	if (categoryResult.error || activityResult.error || eventResult.error || semesterResult.error || subjectResult.error || blockResult.error) { syncStatus('Error de sincronización'); return; }
+	const remoteActivities = activityResult.data || [];
+	const remoteEvents = eventResult.data || [];
+	Object.keys(categoryLabels).forEach(key => { if (!fixedCategories[key]) delete categoryLabels[key]; });
+	Object.keys(customCategories).forEach(key => delete customCategories[key]);
+	Object.keys(categoryRowIds).forEach(key => delete categoryRowIds[key]);
+	(categoryResult.data || []).forEach(row => { const key = categoryKeyForRow(row); categoryRowIds[key] = row.id; categoryColors[key] = row.color; categoryLabels[key] = row.name; if (!row.is_system) customCategories[key] = { name: row.name, color: row.color }; });
+	if (!remoteActivities.length && !remoteEvents.length && allowMigration && activities.length) { normalizeCloudIds(); await syncCloudData(); syncStatus('Sincronizado ahora'); return; }
+	const remoteSemesters = semesterResult.data || [];
+	const remoteSubjects = subjectResult.data || [];
+	const remoteBlocks = blockResult.data || [];
+	semesters = remoteSemesters.map(row => ({ id: row.id, name: row.name, start: row.start_date, end: row.end_date, subjects: remoteSubjects.filter(subject => subject.semester_id === row.id).map(subject => ({ id: subject.id, name: subject.name, blocks: remoteBlocks.filter(block => block.subject_id === subject.id && block.block_type === 'theory').map(block => ({ id: block.id, day: block.weekday, start: block.start_time.slice(0, 5), end: block.end_time.slice(0, 5) })), labBlocks: remoteBlocks.filter(block => block.subject_id === subject.id && block.block_type === 'lab').map(block => ({ id: block.id, day: block.weekday, start: block.start_time.slice(0, 5), end: block.end_time.slice(0, 5) })) })) }));
+	activities = remoteActivities.map(row => ({ id: row.id, name: row.name, category: categoryKeyForRow((categoryResult.data || []).find(category => category.id === row.category_id) || { name: 'Otros' }), type: row.activity_type, medicalKind: row.medical_kind, horaInicio: row.start_time.slice(0, 5), horaFin: row.end_time.slice(0, 5), recoveryHours: row.recovery_hours || 0, notes: row.notes, icon: row.icon, semesterId: row.semester_id, subjectId: row.subject_id, blockId: row.block_id, care: row.activity_type === 'Procedimiento médico' }));
+	events = remoteEvents.map(row => ({ id: row.id, activityId: row.activity_id, date: row.event_date, horaInicio: row.start_time.slice(0, 5), horaFin: row.end_time.slice(0, 5) }));
+	localPersist(); renderAll(); syncStatus('Sincronizado ahora');
+}
+async function syncCloudData() {
+	if (!cloudUser) return;
+	normalizeCloudIds();
+	const semesterIds = new Map();
+	const subjectIds = new Map();
+	const blockRows = [];
+	const blockIds = new Map();
+	const semesterRows = semesters.map(semester => { const oldId = semester.id; semester.id = cloudUuid(semester.id); semesterIds.set(oldId, semester.id); return { id: semester.id, user_id: cloudUser.id, name: semester.name, start_date: semester.start, end_date: semester.end }; });
+	semesters.forEach(semester => semester.subjects.forEach(subject => { const oldId = subject.id; subject.id = cloudUuid(subject.id); subjectIds.set(oldId, subject.id); [...(subject.blocks || []).map(block => ({ ...block, block_type: 'theory' })), ...(subject.labBlocks || []).map(block => ({ ...block, block_type: 'lab' }))].forEach(block => { const oldBlockId = block.id || `${oldId}-${block.block_type}-${block.day}-${block.start}-${block.end}`; block.id = cloudUuid(oldBlockId); blockIds.set(oldBlockId, block.id); blockRows.push({ id: block.id, user_id: cloudUser.id, subject_id: subject.id, block_type: block.block_type, weekday: block.day, start_time: block.start, end_time: block.end, range_start: semester.start, range_end: semester.end }); }); }));
+	activities.forEach(activity => { if (activity.semesterId && semesterIds.has(activity.semesterId)) activity.semesterId = semesterIds.get(activity.semesterId); if (activity.subjectId && subjectIds.has(activity.subjectId)) activity.subjectId = subjectIds.get(activity.subjectId); if (activity.blockId && blockIds.has(activity.blockId)) activity.blockId = blockIds.get(activity.blockId); else if (activity.blockId && !uuidPattern.test(activity.blockId)) activity.blockId = null; });
+	const categories = allCategories().map(key => ({ id: categoryRowIds[key] || crypto.randomUUID(), user_id: cloudUser.id, name: categoryLabels[key] || titleCase(key), color: categoryColors[key], is_system: Boolean(fixedCategories[key]) }));
+	categories.forEach(row => { categoryRowIds[categoryKey(row.name)] = row.id; });
+	const activityRows = activities.map(activity => ({ id: activity.id, user_id: cloudUser.id, category_id: categoryRowIds[activity.category] || categoryRowIds.otros, name: activity.name, activity_type: activity.type || 'Actividad', medical_kind: activity.medicalKind || null, start_time: activity.horaInicio, end_time: activity.horaFin, recovery_hours: activity.recoveryHours || 0, notes: activity.notes || null, icon: activity.icon || null, semester_id: activity.semesterId || null, subject_id: activity.subjectId || null, block_id: activity.blockId || null }));
+	const eventRows = events.map(event => ({ id: event.id, user_id: cloudUser.id, activity_id: event.activityId, event_date: event.date, start_time: event.horaInicio, end_time: event.horaFin, is_generated: Boolean(event.blockId || event.subjectId) }));
+	const categoryUpsert = await supabase.from('categories').upsert(categories);
+	const semesterUpsert = await supabase.from('semesters').upsert(semesterRows);
+	const subjectRows = semesters.flatMap(semester => semester.subjects.map(subject => ({ id: subject.id, user_id: cloudUser.id, semester_id: semester.id, name: subject.name, has_lab: Boolean(subject.labBlocks?.length) })));
+	const subjectUpsert = await supabase.from('subjects').upsert(subjectRows);
+	const blockUpsert = await supabase.from('schedule_blocks').upsert(blockRows);
+	const activityUpsert = await supabase.from('activities').upsert(activityRows);
+	const eventUpsert = await supabase.from('events').upsert(eventRows);
+	if (categoryUpsert.error || semesterUpsert.error || subjectUpsert.error || blockUpsert.error || activityUpsert.error || eventUpsert.error) { syncStatus('Error de sincronización'); return; }
+	syncStatus('Sincronizado ahora');
+}
+persist = function() { localPersist(); if (cloudUser) void syncCloudData(); };
+function subscribeCloud() { if (cloudChannel) supabase.removeChannel(cloudChannel); if (!cloudUser) return; cloudChannel = supabase.channel(`ritmo-${cloudUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `user_id=eq.${cloudUser.id}` }, () => void loadCloudData(false)).on('postgres_changes', { event: '*', schema: 'public', table: 'semesters', filter: `user_id=eq.${cloudUser.id}` }, () => void loadCloudData(false)).on('postgres_changes', { event: '*', schema: 'public', table: 'subjects', filter: `user_id=eq.${cloudUser.id}` }, () => void loadCloudData(false)).on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_blocks', filter: `user_id=eq.${cloudUser.id}` }, () => void loadCloudData(false)).on('postgres_changes', { event: '*', schema: 'public', table: 'activities', filter: `user_id=eq.${cloudUser.id}` }, () => void loadCloudData(false)).on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `user_id=eq.${cloudUser.id}` }, () => void loadCloudData(false)).subscribe(); }
+supabase.auth.onAuthStateChange(async (_event, session) => { cloudUser = session?.user || null; if (cloudUser) { await loadCloudData(); subscribeCloud(); } else if (cloudChannel) { await supabase.removeChannel(cloudChannel); cloudChannel = null; } });
+
 let authMode = 'login';
 function setAuthMessage(message, type = '') { const element = $('#auth-message'); element.textContent = message; element.className = `auth-message ${type}`; }
 function setAuthenticated(user) { const isAuthenticated = Boolean(user); $('#auth-screen').style.display = isAuthenticated ? 'none' : 'grid'; $('#app-shell').classList.toggle('auth-hidden', !isAuthenticated); if (user?.email) { const initials = user.email.slice(0, 2).toUpperCase(); $('#user-avatar').textContent = initials; } }
