@@ -26,7 +26,14 @@ La aplicación ya incluye:
 - Cierre de sesión.
 - Bloqueo de la agenda hasta autenticar al usuario.
 
-En Supabase activa únicamente **Authentication → Providers → Email**. En **Authentication → URL Configuration** agrega como Site URL y Redirect URL la URL final de Netlify, por ejemplo `https://tu-sitio.netlify.app/`.
+En Supabase activa únicamente **Authentication → Providers → Email**. En **Authentication → URL Configuration** agrega como Site URL y Redirect URL tanto la URL local como la de producción:
+
+```text
+http://localhost:5173/
+https://tu-sitio.netlify.app/
+```
+
+El registro puede requerir confirmación de correo según la opción **Confirm email** de Supabase. Cuando está activa, la cuenta se crea y la aplicación muestra el aviso para confirmar antes de iniciar sesión. El enlace de recuperación devuelve a la aplicación en modo **Crear una nueva contraseña**; por eso la URL desde la que se abrió la app debe estar incluida en Redirect URLs.
 
 En Netlify configura estas variables en **Site configuration → Environment variables**:
 

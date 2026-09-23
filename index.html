@@ -95,8 +95,16 @@
       .confirm-scope label { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 12px; }
       .confirm-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
       .confirm-actions .danger-button { background: #c9654e; color: white; padding: 11px 15px; border-radius: 5px; font-size: 12px; font-weight: 700; }
-      .auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--paper); }
-      .auth-card { width: min(100%, 420px); background: var(--white); border: 1px solid var(--line); border-radius: 9px; padding: 36px; box-shadow: 0 18px 50px rgba(37,37,34,.08); }
+      .auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: radial-gradient(circle at 12% 15%, rgba(233,130,105,.2), transparent 28%), linear-gradient(135deg, #f4f2ed 0%, #e9eee8 100%); }
+      .auth-layout { width: min(100%, 980px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); align-items: stretch; background: rgba(255,253,250,.6); border: 1px solid rgba(255,255,255,.75); border-radius: 18px; overflow: hidden; box-shadow: 0 24px 70px rgba(37,37,34,.13); }
+      .auth-showcase { display: flex; flex-direction: column; justify-content: space-between; padding: 46px; min-height: 590px; background: linear-gradient(145deg, #526b59 0%, #314c3b 100%); color: #fffdfa; }
+      .auth-showcase .brand { color: #fffdfa; }
+      .auth-showcase h2 { max-width: 410px; margin: auto 0 14px; font-size: clamp(34px, 4vw, 54px); line-height: .98; letter-spacing: -2.5px; }
+      .auth-showcase p { max-width: 355px; margin: 0; color: rgba(255,253,250,.72); font-size: 13px; line-height: 1.7; }
+      .auth-points { display: grid; gap: 11px; margin-top: 30px; }
+      .auth-point { display: flex; align-items: center; gap: 9px; color: rgba(255,253,250,.82); font-size: 11px; }
+      .auth-point i { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+      .auth-card { width: 100%; background: var(--white); padding: 46px 40px; }
       .auth-card .brand { margin-bottom: 38px; }
       .auth-card h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -1.5px; }
       .auth-card .auth-copy { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 24px; }
@@ -111,25 +119,36 @@
       .logout-button { background: transparent; color: var(--muted); font-size: 11px; padding: 0; }
       #subject-form .section-heading { justify-content: space-between; margin-top: 20px; }
       #subject-form .section-heading h3 { font-size: 13px; margin: 0; }
+      @media (max-width: 760px) { .auth-screen { padding: 16px; } .auth-layout { display: block; } .auth-showcase { display: none; } .auth-card { padding: 32px 24px; } }
       @media (max-width: 600px) { .time-fields { grid-template-columns: 1fr; gap: 0; } }
       @media (max-width: 600px) { .page-heading, .study-panel { display: block; } .page-actions { justify-content: flex-start; margin-top: 20px; flex-wrap: wrap; } .study-panel .outline-button { margin-top: 15px; } .schedule-block { grid-template-columns: 1fr 1fr; } .month-cell { min-height: 82px; padding: 5px; } .availability-row { grid-template-columns: 1fr; gap: 5px; } .calendar-grid { min-width: 0; } .calendar-card { margin-right: -5vw; } }
     </style>
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
-      <div class="auth-card">
-        <div class="brand"><span class="brand-mark">r</span><span>ritmo</span></div>
-        <p class="eyebrow" id="auth-eyebrow">Tu agenda, contigo.</p>
-        <h1 id="auth-title">Bienvenido a Ritmo</h1>
-        <p class="auth-copy" id="auth-copy">Inicia sesión para acceder a tu agenda y mantenerla sincronizada entre tus dispositivos.</p>
-        <form id="auth-form">
-          <label>Correo electrónico<input id="auth-email" type="email" autocomplete="email" required /></label>
-          <label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required /></label>
-          <button class="primary-button full-width" id="auth-submit" type="submit">Iniciar sesión <span>→</span></button>
-        </form>
-        <button class="auth-switch" id="auth-switch" type="button">¿No tienes cuenta? Crear una</button>
-        <button class="auth-switch" id="auth-forgot" type="button">¿Olvidaste tu contraseña?</button>
-        <div class="auth-message" id="auth-message" role="status"></div>
+      <div class="auth-layout">
+        <aside class="auth-showcase">
+          <div class="brand"><span class="brand-mark">r</span><span>ritmo</span></div>
+          <div>
+            <h2>Hazle espacio a lo que importa.</h2>
+            <p>Una agenda que entiende tu tiempo real y te ayuda a organizarlo sin llenarlo de ruido.</p>
+            <div class="auth-points"><span class="auth-point"><i></i>Agenda sincronizada en la nube</span><span class="auth-point"><i></i>Disponibilidad visible de un vistazo</span><span class="auth-point"><i></i>Tu información, solo para ti</span></div>
+          </div>
+        </aside>
+        <div class="auth-card">
+          <div class="brand"><span class="brand-mark">r</span><span>ritmo</span></div>
+          <p class="eyebrow" id="auth-eyebrow">Tu agenda, contigo.</p>
+          <h1 id="auth-title">Bienvenido a Ritmo</h1>
+          <p class="auth-copy" id="auth-copy">Inicia sesión para acceder a tu agenda y mantenerla sincronizada entre tus dispositivos.</p>
+          <form id="auth-form">
+            <label>Correo electrónico<input id="auth-email" type="email" autocomplete="email" required /></label>
+            <label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required /></label>
+            <button class="primary-button full-width" id="auth-submit" type="submit">Iniciar sesión <span>→</span></button>
+          </form>
+          <button class="auth-switch" id="auth-switch" type="button">¿No tienes cuenta? Crear una</button>
+          <button class="auth-switch" id="auth-forgot" type="button">¿Olvidaste tu contraseña?</button>
+          <div class="auth-message" id="auth-message" role="status"></div>
+        </div>
       </div>
     </section>
     <div class="app-shell auth-hidden" id="app-shell">
