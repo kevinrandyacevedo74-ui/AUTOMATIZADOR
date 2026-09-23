@@ -13,7 +13,7 @@ npm run dev
 
 La conexión inicial con Supabase usa `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` en `.env.local`. No uses una clave `service_role` en el navegador.
 
-El esquema completo de Supabase está en [supabase-schema.sql](AUTIMATIZADOR/supabase-schema.sql). Pégalo completo en **Supabase → SQL Editor** y pulsa **Run**.
+El esquema completo de Supabase está en [supabase-schema.sql](AUTIMATIZADOR/supabase-schema.sql). Pégalo completo en **Supabase → SQL Editor** y pulsa **Run**. Debe ejecutarse antes de probar la agenda sincronizada.
 
 ### Autenticación
 
@@ -26,14 +26,23 @@ La aplicación ya incluye:
 - Cierre de sesión.
 - Bloqueo de la agenda hasta autenticar al usuario.
 
-En Supabase activa únicamente **Authentication → Providers → Email**. En **Authentication → URL Configuration** agrega como Site URL y Redirect URL tanto la URL local como la de producción:
+Configuración comprobada para el proyecto actual:
+
+- **Authentication → Providers → Email**: activo.
+- **Disable sign ups**: desactivado.
+- **Confirm email**: puede permanecer activo; en ese caso el usuario debe confirmar su correo antes de entrar.
+
+En **Authentication → URL Configuration** configura como **Site URL** la URL de producción cuando exista. En **Redirect URLs** agrega cada URL desde la que abrirás la aplicación:
 
 ```text
 http://localhost:5173/
+http://127.0.0.1:5173/
 https://tu-sitio.netlify.app/
 ```
 
 El registro puede requerir confirmación de correo según la opción **Confirm email** de Supabase. Cuando está activa, la cuenta se crea y la aplicación muestra el aviso para confirmar antes de iniciar sesión. El enlace de recuperación devuelve a la aplicación en modo **Crear una nueva contraseña**; por eso la URL desde la que se abrió la app debe estar incluida en Redirect URLs.
+
+Para copiar las credenciales correctas, ve a **Project Settings → API** y usa **Project URL** como `VITE_SUPABASE_URL` y la clave **Publishable key** como `VITE_SUPABASE_PUBLISHABLE_KEY`. Nunca uses `service_role` en el navegador. Después de cambiar `.env.local`, reinicia Vite.
 
 En Netlify configura estas variables en **Site configuration → Environment variables**:
 

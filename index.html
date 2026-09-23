@@ -110,7 +110,13 @@
       .auth-card .auth-copy { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 24px; }
       .auth-card label { display: block; margin: 15px 0; color: #66645c; font-size: 11px; font-weight: 700; }
       .auth-card input { display: block; width: 100%; margin-top: 7px; padding: 12px; border: 1px solid var(--line); border-radius: 5px; background: #faf9f5; }
-      .auth-switch { border: 0; background: transparent; color: var(--coral-dark); font-size: 11px; padding: 15px 0 0; }
+      .auth-actions { display: grid; gap: 10px; margin-top: 14px; }
+      .auth-switch { border: 0; font-size: 11px; font-weight: 700; }
+      .auth-button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 14px; border: 1px solid var(--coral-dark); border-radius: 5px; background: transparent; color: var(--coral-dark); }
+      .auth-button:hover { background: var(--coral-dark); color: #fff; }
+      .auth-button span { font-size: 16px; line-height: 1; }
+      .auth-link { justify-self: center; padding: 4px; background: transparent; color: var(--muted); font-weight: 600; }
+      .auth-link:hover { color: var(--coral-dark); }
       .auth-message { min-height: 18px; font-size: 11px; line-height: 1.5; margin-top: 14px; }
       .auth-message.error { color: var(--coral-dark); }
       .auth-message.success { color: var(--sage-deep); }
@@ -145,8 +151,10 @@
             <label>Contraseña<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required /></label>
             <button class="primary-button full-width" id="auth-submit" type="submit">Iniciar sesión <span>→</span></button>
           </form>
-          <button class="auth-switch" id="auth-switch" type="button">¿No tienes cuenta? Crear una</button>
-          <button class="auth-switch" id="auth-forgot" type="button">¿Olvidaste tu contraseña?</button>
+          <div class="auth-actions">
+            <button class="auth-switch auth-button" id="auth-switch" type="button">Crear una cuenta <span>→</span></button>
+            <button class="auth-switch auth-link" id="auth-forgot" type="button">¿Olvidaste tu contraseña?</button>
+          </div>
           <div class="auth-message" id="auth-message" role="status"></div>
         </div>
       </div>
