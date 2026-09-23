@@ -13,6 +13,8 @@ npm run dev
 
 La conexión inicial con Supabase usa `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` en `.env.local`. No uses una clave `service_role` en el navegador.
 
+El esquema completo de Supabase está en [supabase-schema.sql](AUTIMATIZADOR/supabase-schema.sql). Pégalo completo en **Supabase → SQL Editor** y pulsa **Run**.
+
 ### Autenticación
 
 La aplicación ya incluye:
